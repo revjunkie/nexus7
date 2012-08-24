@@ -510,6 +510,15 @@ config AUTO_HOTPLUG
 	default n
 	help
 
+config TEGRA_DC_USE_HW_BPP
+       bool "Default Bits Per Pixel value from tegra DC hardware"
+       depends on TEGRA_DC
+       default n
+        help
+         Programs platform data to inform DC driver to use current
+         hardware value for bits per pixel setting.  Useful for
+          preserving and displaying framebuffer content from bootloader.
+
 config GROUPER_HARDBOOT_RECOVERY
  	bool "Reboot to recovery partition when using Kexec-hardboot"
  	depends on MACH_GROUPER

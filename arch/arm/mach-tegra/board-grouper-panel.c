@@ -511,7 +511,11 @@ static struct tegra_fb_data grouper_fb_data = {
 	.win		= 0,
 	.xres		= 800,
 	.yres		= 1280,
-	.bits_per_pixel	= 32,
+#ifdef CONFIG_TEGRA_DC_USE_HW_BPP
+       .bits_per_pixel = -1,
+#else
+        .bits_per_pixel = 32,
+#endif
 //	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
 
@@ -519,7 +523,11 @@ static struct tegra_fb_data grouper_hdmi_fb_data = {
 	.win		= 0,
 	.xres		= 800,
 	.yres		= 1280,
-	.bits_per_pixel	= 32,
+#ifdef CONFIG_TEGRA_DC_USE_HW_BPP
+       .bits_per_pixel = -1,
+#else
+        .bits_per_pixel = 32,
+#endif
 	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
 
