@@ -66,9 +66,9 @@ static struct regulator *grouper_lvds_reg;
 static struct regulator *grouper_lvds_vdd_panel;
 
 static tegra_dc_bl_output grouper_bl_output_measured = {
-	0, 13, 13, 13, 13, 13, 13, 13,
-	13, 13, 13, 13, 13, 13, 14, 15,
-	16, 17, 18, 19, 20, 21, 22, 23,
+	0, 8, 8, 8, 8, 8, 8, 8,
+ 	8, 8, 8, 8, 8, 8, 15, 15,
+ 	15, 15, 15, 15, 15, 15, 22, 23,
 	24, 25, 26, 27, 28, 29, 30, 31,
 	32, 33, 34, 35, 36, 37, 38, 39,
 	40, 41, 42, 43, 44, 45, 46, 47,
@@ -410,7 +410,7 @@ static struct tegra_dc_sd_settings grouper_sd_settings = {
 	.bin_width = -1,
 	.aggressiveness = 1,
 	.phase_in_adjustments = true,
-	.panel_min_brightness = 13,
+	.panel_min_brightness = 8,
 	.use_vid_luma = false,
 	/* Default video coefficients */
 	.coeff = {5, 9, 2},
@@ -549,7 +549,7 @@ static struct tegra_dc_out grouper_disp1_out = {
 
 	.type		= TEGRA_DC_OUT_RGB,
 	.depth		= 18,
-	.dither		= TEGRA_DC_ORDERED_DITHER,
+	.dither		= TEGRA_DC_ERRDIFF_DITHER,
 
 	.modes		= grouper_panel_modes,
 	.n_modes	= ARRAY_SIZE(grouper_panel_modes),
