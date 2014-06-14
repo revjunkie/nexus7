@@ -31,6 +31,8 @@
 #include <linux/cpu.h>
 #include <linux/workqueue.h>
 #include <linux/sched.h>
+#include <linux/slab.h>
+#include <linux/input.h>
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
@@ -46,7 +48,7 @@
  */
 #define DEBUG 0
 #define CPUS_AVAILABLE		num_possible_cpus()
-#define SAMPLING_PERIODS 	15	/* SAMPLING_PERIODS * MIN_SAMPLING_RATE is the minimum load history which will be averaged */
+#define SAMPLING_PERIODS 	18	/* SAMPLING_PERIODS * MIN_SAMPLING_RATE is the minimum load history which will be averaged */
 #define INDEX_MAX_VALUE		(SAMPLING_PERIODS - 1)
 #define MIN_SAMPLING_RATE	msecs_to_jiffies(20)	/* MIN_SAMPLING_RATE is scaled based on num_online_cpus() */
 
@@ -54,32 +56,35 @@
 unsigned char flags;
 #define HOTPLUG_DISABLED	(1 << 0)
 #define HOTPLUG_PAUSED		(1 << 1)
-#define BOOSTPULSE_ACTIVE	(1 << 2)
 #define EARLYSUSPEND_ACTIVE	(1 << 3)
 
 /*
  * Load defines:
  * ENABLE_ALL is a high watermark to rapidly online all CPUs
  *
- * ENABLE is the load which is required to enable 1 extra CPU
  * DISABLE is the load at which a CPU is disabled
  * These two are scaled based on num_online_cpus()
  */
 
 static unsigned int enable_all_load_threshold = 500;
-static unsigned int enable_load_threshold = 280;
+static unsigned int second_threshold = 450;
 static unsigned int disable_load_threshold = 80;
-static unsigned int always_on = 1;
+static unsigned int min_cpu_online = 1;
+static unsigned int max_cpu_online = 4;
+static unsigned int first_threshold = 300;
 
 module_param(enable_all_load_threshold, int, 0755);
-module_param(enable_load_threshold, int, 0755);
+module_param(second_threshold, int, 0755);
 module_param(disable_load_threshold, int, 0755);
-module_param(always_on, int, 0755);
+module_param(min_cpu_online, int, 0755);
+module_param(max_cpu_online, int, 0755);
+module_param(first_threshold, int, 0755);
 
 struct delayed_work hotplug_decision_work;
 struct delayed_work hotplug_unpause_work;
 struct work_struct hotplug_online_all_work;
 struct work_struct hotplug_online_single_work;
+struct work_struct touchplug_boost_work;
 struct delayed_work hotplug_offline_work;
 
 static unsigned int history[SAMPLING_PERIODS];
@@ -87,7 +92,7 @@ static unsigned int index;
 
 static void hotplug_decision_work_fn(struct work_struct *work)
 {
-	unsigned int running, disable_load, sampling_rate, enable_load, avg_running = 0;
+	unsigned int running, disable_load, sampling_rate, avg_running = 0;
 	unsigned int online_cpus, available_cpus, i, j;
 #if DEBUG
 	unsigned int k;
@@ -95,8 +100,7 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 
 	online_cpus = num_online_cpus();
 	available_cpus = 4;
-	disable_load = disable_load_threshold * online_cpus; 
-	enable_load = enable_load_threshold * online_cpus;
+	disable_load = disable_load_threshold * online_cpus; ;
 	/*
 	 * Multiply nr_running() by 100 so we don't have to
 	 * use fp division to get the average.
@@ -165,8 +169,14 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 		} else if (flags & HOTPLUG_PAUSED) {
 			schedule_delayed_work_on(0, &hotplug_decision_work, MIN_SAMPLING_RATE); 
 			return;
-		} else if ((avg_running >= enable_load) && (online_cpus < available_cpus)) {
-			pr_debug("auto_hotplug: Onlining single CPU, avg running: %d\n", avg_running);
+		} else if ((avg_running >= first_threshold) && (online_cpus < 2)) {
+			pr_info("auto_hotplug: Onlining single CPU, avg running: %d\n", avg_running);
+			if (delayed_work_pending(&hotplug_offline_work))
+				cancel_delayed_work(&hotplug_offline_work);			
+			schedule_work(&hotplug_online_single_work);
+			return;
+		} else if ((avg_running >= second_threshold) && (online_cpus < available_cpus)) {
+			pr_info("auto_hotplug: Onlining single CPU, avg running: %d\n", avg_running);
 			if (delayed_work_pending(&hotplug_offline_work))
 				cancel_delayed_work(&hotplug_offline_work);
 			schedule_work(&hotplug_online_single_work);
@@ -176,6 +186,7 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 			if (!(delayed_work_pending(&hotplug_offline_work))) {
 				pr_debug("auto_hotplug: Offlining CPU, avg running: %d\n", avg_running);
 				schedule_delayed_work_on(0, &hotplug_offline_work, HZ);
+			return;
 			}
 		}
 	}
@@ -223,12 +234,21 @@ static void __init hotplug_online_single_work_fn(struct work_struct *work)
 	schedule_delayed_work_on(0, &hotplug_decision_work, MIN_SAMPLING_RATE);
 }
 
+static void __init touchplug_boost_work_fn(struct work_struct *work)
+{
+	if (num_online_cpus() < 2) {
+ 			cpu_up(1);
+	}
+	schedule_delayed_work(&hotplug_unpause_work, HZ * 1);
+	schedule_delayed_work_on(0, &hotplug_decision_work, MIN_SAMPLING_RATE);
+}
+
 static void hotplug_offline_work_fn(struct work_struct *work)
 {
 	int cpu;
 
 	for_each_online_cpu(cpu) {
-		if (cpu && num_online_cpus() > always_on) {
+		if (cpu && num_online_cpus() > min_cpu_online) {
 			cpu_down(num_online_cpus() - 1);
 			pr_info("auto_hotplug: CPU%d down.\n", cpu);
 			break;
@@ -259,15 +279,114 @@ void hotplug_disable(bool flag)
 	}
 }
 
+static void touchplug_input_event(struct input_handle *handle,
+ 		unsigned int type, unsigned int code, int value)
+{
+#ifdef DEBUG
+ 	pr_info("touchplug touched!\n");
+#endif
+ 	cancel_delayed_work_sync(&hotplug_offline_work);
+ 
+	schedule_work(&touchplug_boost_work);
+}
+ 
+static int input_dev_filter(const char *input_dev_name)
+{
+ 	if (strstr(input_dev_name, "touchscreen") ||
+ 		strstr(input_dev_name, "sec_touchscreen") ||
+ 		strstr(input_dev_name, "touch_dev") ||
+ 		strstr(input_dev_name, "-keypad") ||
+ 		strstr(input_dev_name, "-nav") ||
+ 		strstr(input_dev_name, "-oj")) {
+ 		pr_info("touch dev: %s\n", input_dev_name);
+ 		return 0;
+ 	} else {
+ 		pr_info("touch dev: %s\n", input_dev_name);
+ 		return 1;
+ 	}
+}
+ 
+static int touchplug_input_connect(struct input_handler *handler,
+ 		struct input_dev *dev, const struct input_device_id *id)
+{
+ 	struct input_handle *handle;
+ 	int error;
+ 
+ 	if (input_dev_filter(dev->name))
+ 		return -ENODEV;
+ 
+ 	handle = kzalloc(sizeof(struct input_handle), GFP_KERNEL);
+ 	if (!handle)
+ 		return -ENOMEM;
+ 
+ 	handle->dev = dev;
+ 	handle->handler = handler;
+ 	handle->name = "auto_hotplug";
+ 
+ 	error = input_register_handle(handle);
+ 	if (error)
+ 		goto err2;
+ 
+ 	error = input_open_device(handle);
+ 	if (error)
+ 		goto err1;
+ 	pr_info("%s found and connected!\n", dev->name);
+ 	return 0;
+ err1:
+ 	input_unregister_handle(handle);
+ err2:
+ 	kfree(handle);
+ 	return error;
+}
+ 
+static void touchplug_input_disconnect(struct input_handle *handle)
+{
+ 	input_close_device(handle);
+ 	input_unregister_handle(handle);
+ 	kfree(handle);
+}
+
+static const struct input_device_id touchplug_ids[] = {
+ 	{
+ 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
+ 			 INPUT_DEVICE_ID_MATCH_ABSBIT,
+ 		.evbit = { BIT_MASK(EV_ABS) },
+ 		.absbit = { [BIT_WORD(ABS_MT_POSITION_X)] =
+ 			    BIT_MASK(ABS_MT_POSITION_X) |
+ 			    BIT_MASK(ABS_MT_POSITION_Y) },
+ 	}, /* multi-touch touchscreen */
+ 	{
+ 		.flags = INPUT_DEVICE_ID_MATCH_KEYBIT |
+ 			 INPUT_DEVICE_ID_MATCH_ABSBIT,
+ 		.keybit = { [BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH) },
+ 		.absbit = { [BIT_WORD(ABS_X)] =
+ 			    BIT_MASK(ABS_X) | BIT_MASK(ABS_Y) },
+ 	}, /* touchpad */
+ 	{ },
+};
+ 
+static struct input_handler touchplug_input_handler = {
+ 	.event          = touchplug_input_event,
+ 	.connect        = touchplug_input_connect,
+ 	.disconnect     = touchplug_input_disconnect,
+ 	.name           = "touchplug_input_handler",
+ 	.id_table       = touchplug_ids,
+};
+
 int __init auto_hotplug_init(void)
 {
+	int ret;
+
 	pr_info("auto_hotplug: v0.220 by _thalamus\n");
 	pr_info("auto_hotplug: %d CPUs detected\n", CPUS_AVAILABLE);
+
+	ret = input_register_handler(&touchplug_input_handler);
 
 	INIT_DELAYED_WORK(&hotplug_decision_work, hotplug_decision_work_fn);
 	INIT_DELAYED_WORK_DEFERRABLE(&hotplug_unpause_work, hotplug_unpause_work_fn);
 	INIT_WORK(&hotplug_online_all_work, hotplug_online_all_work_fn);
 	INIT_WORK(&hotplug_online_single_work, hotplug_online_single_work_fn);
+	INIT_WORK(&touchplug_boost_work, touchplug_boost_work_fn);
 	INIT_DELAYED_WORK_DEFERRABLE(&hotplug_offline_work, hotplug_offline_work_fn);
 
 	/*
