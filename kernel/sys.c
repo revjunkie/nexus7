@@ -125,7 +125,7 @@ EXPORT_SYMBOL(cad_pid);
 
 void (*pm_power_off_prepare)(void);
 
-//extern void disable_auto_hotplug(void);
+extern void disable_auto_hotplug(void);
 /*
  * Returns true if current's euid is same as p's uid or euid,
  * or has CAP_SYS_NICE to p's user_ns.
