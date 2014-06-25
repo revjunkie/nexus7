@@ -3816,7 +3816,7 @@ void update_cpu_load_nohz(void)
 #endif /* CONFIG_NO_HZ */
 
 /*
-/*
+ *
  * Called from scheduler_tick()
  */
 static void update_cpu_load_active(struct rq *this_rq)
