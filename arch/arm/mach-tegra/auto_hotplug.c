@@ -31,6 +31,8 @@
 #include <linux/cpu.h>
 #include <linux/workqueue.h>
 #include <linux/sched.h>
+#include <linux/device.h>
+#include <linux/miscdevice.h>
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
@@ -44,11 +46,16 @@
  * FIXME: Turn it into debugfs stats (somehow)
  * because currently it is a sack of shit.
  */
-#define DEBUG 0
 #define CPUS_AVAILABLE		num_possible_cpus()
-#define SAMPLING_PERIODS 	18	/* SAMPLING_PERIODS * MIN_SAMPLING_RATE is the minimum load history which will be averaged */
-#define INDEX_MAX_VALUE		(SAMPLING_PERIODS - 1)
-#define MIN_SAMPLING_RATE	msecs_to_jiffies(20)	/* MIN_SAMPLING_RATE is scaled based on num_online_cpus() */
+#define SAMPLING_PERIODS 		18	
+#define INDEX_MAX_VALUE		(SAMPLING_PERIODS - 1)	
+
+#define SHIFT_ALL			500
+#define SHIFT_CPU			225
+#define DOWN_SHIFT			80
+#define MIN_CPU			1
+#define MAX_CPU			4
+#define SAMPLE_TIME		20
 
 /* Control flags */
 unsigned char flags;
@@ -57,27 +64,24 @@ unsigned char flags;
 #define BOOSTPULSE_ACTIVE	(1 << 2)
 #define EARLYSUSPEND_ACTIVE	(1 << 3)
 
-/*
- * Load defines:
- * ENABLE_ALL is a high watermark to rapidly online all CPUs
- *
- * ENABLE is the load which is required to enable 1 extra CPU
- * DISABLE is the load at which a CPU is disabled
- * These two are scaled based on num_online_cpus()
- */
+struct rev_tune
+{
+unsigned int shift_all;
+unsigned int shift_cpu;
+unsigned int down_shift;
+unsigned int min_cpu;
+unsigned int max_cpu;
+unsigned int sample_time;
+} rev = {
+	.shift_all = SHIFT_ALL,
+	.shift_cpu = SHIFT_CPU,
+	.down_shift = DOWN_SHIFT,
+	.min_cpu = MIN_CPU,
+	.max_cpu = MAX_CPU,
+	.sample_time = SAMPLE_TIME,
+};
 
-static unsigned int enable_all_load_threshold = 500;
-static unsigned int enable_load_threshold = 225;
-static unsigned int disable_load_threshold = 80;
-static unsigned int min_cpu_online = 1;
-static unsigned int max_cpu_online = 4;
 static unsigned int debug = 0;
-
-module_param(enable_all_load_threshold, int, 0644);
-module_param(enable_load_threshold, int, 0644);
-module_param(disable_load_threshold, int, 0644);
-module_param(min_cpu_online, int, 0644);
-module_param(max_cpu_online, int, 0644);
 module_param(debug, uint, 0644);
 
 #define dprintk(msg...)		\
@@ -101,9 +105,9 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 	unsigned int online_cpus, available_cpus, i, j;
 
 	online_cpus = num_online_cpus();
-	available_cpus = max_cpu_online;
-	disable_load = disable_load_threshold * online_cpus; 
-	enable_load = enable_load_threshold * online_cpus;
+	available_cpus = rev.max_cpu;
+	disable_load = rev.down_shift * online_cpus; 
+	enable_load = rev.shift_cpu * online_cpus;
 	/*
 	 * Multiply nr_running() by 100 so we don't have to
 	 * use fp division to get the average.
@@ -142,7 +146,7 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 
 
 	if (likely(!(flags & HOTPLUG_DISABLED))) {
-		if (unlikely((avg_running >= enable_all_load_threshold) && (online_cpus < available_cpus))) {
+		if (unlikely((avg_running >= rev.shift_all) && (online_cpus < available_cpus))) {
 			pr_info("auto_hotplug: Onlining all CPUs, avg running: %d\n", avg_running);
 			/*
 			 * Flush any delayed offlining work from the workqueue.
@@ -158,7 +162,7 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 			schedule_work(&hotplug_online_all_work);
 			return;
 		} else if (flags & HOTPLUG_PAUSED) {
-			schedule_delayed_work_on(0, &hotplug_decision_work, MIN_SAMPLING_RATE);
+			schedule_delayed_work_on(0, &hotplug_decision_work, msecs_to_jiffies(rev.sample_time));
 			return;
 		} else if ((avg_running >= enable_load) && (online_cpus < available_cpus)) {
 			pr_info("auto_hotplug: Onlining single CPU, avg running: %d\n", avg_running);
@@ -178,10 +182,8 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 	/*
 	 * Reduce the sampling rate dynamically based on online cpus.
 	 */
-	sampling_rate = MIN_SAMPLING_RATE * (online_cpus * online_cpus);
-#if DEBUG
+	sampling_rate = msecs_to_jiffies(rev.sample_time) * (online_cpus * online_cpus);
 	dprintk("sampling_rate is: %d\n", jiffies_to_msecs(sampling_rate));
-#endif
 	schedule_delayed_work_on(0, &hotplug_decision_work, sampling_rate);
 
 }
@@ -199,7 +201,7 @@ static void __cpuinit hotplug_online_all_work_fn(struct work_struct *work)
 	 * Pause for 1 second before even considering offlining a CPU
 	 */
 	schedule_delayed_work(&hotplug_unpause_work, HZ * 1);
-	schedule_delayed_work_on(0, &hotplug_decision_work, MIN_SAMPLING_RATE);
+	schedule_delayed_work_on(0, &hotplug_decision_work, msecs_to_jiffies(rev.sample_time));
 }
 
 static void __cpuinit hotplug_online_single_work_fn(struct work_struct *work)
@@ -215,7 +217,7 @@ static void __cpuinit hotplug_online_single_work_fn(struct work_struct *work)
 			}
 		}
 	}
-	schedule_delayed_work_on(0, &hotplug_decision_work, MIN_SAMPLING_RATE);
+	schedule_delayed_work_on(0, &hotplug_decision_work, msecs_to_jiffies(rev.sample_time));
 }
 
 static void hotplug_offline_work_fn(struct work_struct *work)
@@ -223,13 +225,13 @@ static void hotplug_offline_work_fn(struct work_struct *work)
 	int cpu;
 
 	for_each_online_cpu(cpu) {
-		if (cpu && num_online_cpus() > min_cpu_online) {
+		if (cpu && num_online_cpus() > rev.min_cpu) {
 			cpu_down(num_online_cpus() - 1);
 			dprintk("auto_hotplug: CPU%d down.\n", cpu);
 			break;
 		}
 	}
-	schedule_delayed_work_on(0, &hotplug_decision_work, MIN_SAMPLING_RATE);
+	schedule_delayed_work_on(0, &hotplug_decision_work, msecs_to_jiffies(rev.sample_time));
 }
 
 static void hotplug_unpause_work_fn(struct work_struct *work)
@@ -253,6 +255,153 @@ void hotplug_disable(bool flag)
 		cancel_delayed_work_sync(&hotplug_unpause_work);
 	}
 }
+
+/**************SYSFS*******************/
+
+static ssize_t shift_cpu_show(struct device * dev, struct device_attribute * attr, char * buf)
+{
+	return sprintf(buf, "%d\n", rev.shift_cpu);
+}
+
+static ssize_t shift_cpu_store(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+	unsigned int val;
+
+	sscanf(buf, "%u", &val);
+
+	if (val != rev.shift_cpu && val >= 0 && val <= 500)
+	{
+		rev.shift_cpu = val;
+	}
+
+	return size;
+}
+
+static ssize_t shift_all_show(struct device * dev, struct device_attribute * attr, char * buf)
+{
+	return sprintf(buf, "%d\n", rev.shift_all);
+}
+
+static ssize_t shift_all_store(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+	unsigned int val;
+
+	sscanf(buf, "%u", &val);
+
+	if (val != rev.shift_all && val >= 0 && val <= 600)
+	{
+		rev.shift_all = val;
+	}
+
+	return size;
+}
+
+static ssize_t down_shift_show(struct device * dev, struct device_attribute * attr, char * buf)
+{
+	return sprintf(buf, "%d\n", rev.down_shift);
+}
+
+static ssize_t down_shift_store(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+	unsigned int val;
+
+	sscanf(buf, "%u", &val);
+
+	if (val != rev.down_shift && val >= 0 && val <= 200)
+	{
+		rev.down_shift = val;
+	}
+
+	return size;
+}
+
+static ssize_t min_cpu_show(struct device * dev, struct device_attribute * attr, char * buf)
+{
+	return sprintf(buf, "%d\n", rev.min_cpu);
+}
+
+static ssize_t min_cpu_store(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+	unsigned int val;
+
+	sscanf(buf, "%u", &val);
+
+	if (val != rev.min_cpu && val >= 1 && val <= 4)
+	{
+		rev.min_cpu = val;
+	}
+
+	return size;
+}
+
+static ssize_t max_cpu_show(struct device * dev, struct device_attribute * attr, char * buf)
+{
+	return sprintf(buf, "%d\n", rev.max_cpu);
+}
+
+static ssize_t max_cpu_store(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+	unsigned int val;
+
+	sscanf(buf, "%u", &val);
+
+	if (val != rev.max_cpu && val >= 1 && val <= 4)
+	{
+		rev.max_cpu = val;
+	}
+
+	return size;
+}
+
+static ssize_t sample_time_show(struct device * dev, struct device_attribute * attr, char * buf)
+{
+	return sprintf(buf, "%d\n", rev.sample_time);
+}
+
+static ssize_t sample_time_store(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+	unsigned int val;
+
+	sscanf(buf, "%u", &val);
+
+	if (val != rev.sample_time && val >= 1 && val <= 5000)
+	{
+		rev.sample_time = val;
+	}
+
+	return size;
+}
+
+
+static DEVICE_ATTR(shift_cpu, 0644, shift_cpu_show, shift_cpu_store);
+static DEVICE_ATTR(shift_all, 0644, shift_all_show, shift_all_store);
+static DEVICE_ATTR(down_shift, 0644, down_shift_show, down_shift_store);
+static DEVICE_ATTR(min_cpu, 0644, min_cpu_show, min_cpu_store);
+static DEVICE_ATTR(max_cpu, 0644, max_cpu_show, max_cpu_store);
+static DEVICE_ATTR(sample_time, 0644, sample_time_show, sample_time_store);
+
+static struct attribute *revshift_hotplug_attributes[] = 
+    {
+	&dev_attr_shift_cpu.attr,
+	&dev_attr_shift_all.attr,
+	&dev_attr_down_shift.attr,
+	&dev_attr_min_cpu.attr,
+	&dev_attr_max_cpu.attr,
+	&dev_attr_sample_time.attr,	
+	NULL
+    };
+
+static struct attribute_group revshift_hotplug_group = 
+    {
+	.attrs  = revshift_hotplug_attributes,
+    };
+
+static struct miscdevice revshift_hotplug_device = 
+    {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "revshift_hotplug",
+    };
+
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void auto_hotplug_early_suspend(struct early_suspend *handler)
@@ -287,8 +436,25 @@ static struct early_suspend auto_hotplug_suspend = {
 
 int __init auto_hotplug_init(void)
 {
+	int ret;
+
 	pr_info("auto_hotplug: v0.220 by _thalamus\n");
 	dprintk("auto_hotplug: %d CPUs detected\n", CPUS_AVAILABLE);
+
+	ret = misc_register(&revshift_hotplug_device);
+	if (ret)
+	{
+		ret = -EINVAL;
+		goto err;
+	}
+	ret = sysfs_create_group(&revshift_hotplug_device.this_device->kobj,
+			&revshift_hotplug_group);
+
+	if (ret)
+	{
+		ret = -EINVAL;
+		goto err;
+	}
 
 	INIT_DELAYED_WORK(&hotplug_decision_work, hotplug_decision_work_fn);
 	INIT_DELAYED_WORK_DEFERRABLE(&hotplug_unpause_work, hotplug_unpause_work_fn);
@@ -307,5 +473,8 @@ int __init auto_hotplug_init(void)
 	register_early_suspend(&auto_hotplug_suspend);
 #endif
 	return 0;
+err:
+	return ret;
 }
+
 late_initcall(auto_hotplug_init);
