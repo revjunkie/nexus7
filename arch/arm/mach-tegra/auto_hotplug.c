@@ -79,6 +79,7 @@ unsigned int sample_time;
 	.min_cpu = MIN_CPU,
 	.max_cpu = MAX_CPU,
 	.sample_time = SAMPLE_TIME,
+	.sampling_period = SAMPLING_PERIODS,
 };
 
 static unsigned int debug = 0;
@@ -96,7 +97,7 @@ struct work_struct hotplug_online_all_work;
 struct work_struct hotplug_online_single_work;
 struct delayed_work hotplug_offline_work;
 
-static unsigned int history[SAMPLING_PERIODS];
+static unsigned int history[rev.sampling_period];
 static unsigned int index;
 
 static void hotplug_decision_work_fn(struct work_struct *work)
@@ -129,7 +130,7 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 	 * we don't want additional cores to be onlined because
 	 * the cpufreq driver should take care of those load spikes.
 	 */
-	for (i = 0, j = index; i < SAMPLING_PERIODS; i++, j--) {
+	for (i = 0, j = index; i < rev.sampling_period; i++, j--) {
 		avg_running += history[j];
 		if (unlikely(j == 0))
 			j = INDEX_MAX_VALUE;
@@ -372,6 +373,24 @@ static ssize_t sample_time_store(struct device * dev, struct device_attribute * 
 	return size;
 }
 
+static ssize_t sampling_period_show(struct device * dev, struct device_attribute * attr, char * buf)
+{
+	return sprintf(buf, "%d\n", rev.sampling_period);
+}
+
+static ssize_t sampling_period_store(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+	unsigned int val;
+
+	sscanf(buf, "%u", &val);
+
+	if (val != rev.sampling_period && val >= 1 && val <= 5000)
+	{
+		rev.sampling_period = val;
+	}
+
+	return size;
+}
 
 static DEVICE_ATTR(shift_cpu, 0644, shift_cpu_show, shift_cpu_store);
 static DEVICE_ATTR(shift_all, 0644, shift_all_show, shift_all_store);
@@ -379,6 +398,7 @@ static DEVICE_ATTR(down_shift, 0644, down_shift_show, down_shift_store);
 static DEVICE_ATTR(min_cpu, 0644, min_cpu_show, min_cpu_store);
 static DEVICE_ATTR(max_cpu, 0644, max_cpu_show, max_cpu_store);
 static DEVICE_ATTR(sample_time, 0644, sample_time_show, sample_time_store);
+static DEVICE_ATTR(sampling_period, 0644, sampling_period_show, sampling_period_store);
 
 static struct attribute *revshift_hotplug_attributes[] = 
     {
@@ -388,6 +408,7 @@ static struct attribute *revshift_hotplug_attributes[] =
 	&dev_attr_min_cpu.attr,
 	&dev_attr_max_cpu.attr,
 	&dev_attr_sample_time.attr,	
+	&dev_attr_sampling_period.attr,
 	NULL
     };
 
