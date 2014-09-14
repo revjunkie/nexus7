@@ -72,6 +72,7 @@ unsigned int down_shift;
 unsigned int min_cpu;
 unsigned int max_cpu;
 unsigned int sample_time;
+unsigned int sampling_period;
 } rev = {
 	.shift_all = SHIFT_ALL,
 	.shift_cpu = SHIFT_CPU,
@@ -97,7 +98,7 @@ struct work_struct hotplug_online_all_work;
 struct work_struct hotplug_online_single_work;
 struct delayed_work hotplug_offline_work;
 
-static unsigned int history[rev.sampling_period];
+static unsigned int history[SAMPLING_PERIODS];
 static unsigned int index;
 
 static void hotplug_decision_work_fn(struct work_struct *work)
@@ -365,7 +366,7 @@ static ssize_t sample_time_store(struct device * dev, struct device_attribute * 
 
 	sscanf(buf, "%u", &val);
 
-	if (val != rev.sample_time && val >= 1 && val <= 5000)
+	if (val != rev.sample_time && val >= 1 && val <= 500)
 	{
 		rev.sample_time = val;
 	}
@@ -384,7 +385,7 @@ static ssize_t sampling_period_store(struct device * dev, struct device_attribut
 
 	sscanf(buf, "%u", &val);
 
-	if (val != rev.sampling_period && val >= 1 && val <= 5000)
+	if (val != rev.sampling_period && val >= 1 && val <= 500)
 	{
 		rev.sampling_period = val;
 	}
