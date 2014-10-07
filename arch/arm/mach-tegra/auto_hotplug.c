@@ -184,7 +184,7 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 	/*
 	 * Reduce the sampling rate dynamically based on online cpus.
 	 */
-	sampling_rate = msecs_to_jiffies(rev.sample_time) * (online_cpus * online_cpus);
+	sampling_rate = msecs_to_jiffies(rev.sample_time) * online_cpus;
 	dprintk("sampling_rate is: %d\n", jiffies_to_msecs(sampling_rate));
 	schedule_delayed_work_on(0, &hotplug_decision_work, sampling_rate);
 
