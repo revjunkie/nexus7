@@ -67,10 +67,10 @@ static struct regulator *grouper_lvds_vdd_panel;
 
 static tegra_dc_bl_output grouper_bl_output_measured = {
 	0, 8, 8, 8, 8, 8, 8, 8,
- 	8, 8, 8, 8, 8, 8, 15, 15,
- 	15, 15, 15, 15, 15, 15, 22, 23,
-	24, 25, 26, 27, 28, 29, 30, 31,
-	32, 33, 34, 35, 36, 37, 38, 39,
+ 	8, 8, 8, 8, 8, 8, 9, 10,
+	11, 12, 13, 14, 15, 16, 17, 18,
+	19, 20, 21, 22, 23, 24, 25, 26,
+	28, 31, 34, 35, 36, 37, 38, 39,
 	40, 41, 42, 43, 44, 45, 46, 47,
 	48, 49, 49, 50, 51, 52, 53, 54,
 	55, 56, 57, 58, 59, 60, 61, 62,
@@ -153,7 +153,7 @@ static int grouper_backlight_notify(struct device *unused, int brightness)
 	/* Apply any backlight response curve */
 	if (brightness > 255)
 		pr_info("Error: Brightness > 255!\n");
-	else
+	else  
 		brightness = bl_output[brightness];
 
 	return brightness;
@@ -411,6 +411,16 @@ static struct tegra_dc_sd_settings grouper_sd_settings = {
 	.aggressiveness = 1,
 	.phase_in_adjustments = true,
 	.panel_min_brightness = 8,
+#ifdef CONFIG_TEGRA_SD_GEN2
+ 	.k_limit_enable = true,
+ 	.k_limit = 180,
+ 	.sd_window_enable = false,
+ 	.soft_clipping_enable = true,
+ /* Low soft clipping threshold to compensate for aggressive k_limit */
+ 	.soft_clipping_threshold = 128,
+ 	.smooth_k_enable = true,
+ 	.smooth_k_incr = 4,
+#endif
 	.use_vid_luma = false,
 	/* Default video coefficients */
 	.coeff = {5, 9, 2},
