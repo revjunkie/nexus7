@@ -38,14 +38,6 @@
 #include <linux/earlysuspend.h>
 #endif
 
-/*
- * Enable debug output to dump the average
- * calculations and ring buffer array values
- * WARNING: Enabling this causes a ton of overhead
- *
- * FIXME: Turn it into debugfs stats (somehow)
- * because currently it is a sack of shit.
- */
 #define CPUS_AVAILABLE		num_possible_cpus()
 #define SAMPLING_PERIODS 		18	
 #define INDEX_MAX_VALUE		(SAMPLING_PERIODS - 1)	
@@ -61,7 +53,6 @@
 unsigned char flags;
 #define HOTPLUG_DISABLED	(1 << 0)
 #define HOTPLUG_PAUSED		(1 << 1)
-#define BOOSTPULSE_ACTIVE	(1 << 2)
 #define EARLYSUSPEND_ACTIVE	(1 << 3)
 
 struct rev_tune
@@ -121,8 +112,7 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 	dprintk("enable_load is: %d\n", enable_load);
 	dprintk("disable_load is: %d\n", disable_load);
 	dprintk("index is: %d\n", index);
-	dprintk("running is: %d\n", running);
-
+	dprintk("running is: %d\n", running);	
 
 	/*
 	 * Use a circular buffer to calculate the average load
@@ -142,10 +132,9 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 	 */
 	if (unlikely(index++ == INDEX_MAX_VALUE))
 		index = 0;
-
-	avg_running = avg_running / SAMPLING_PERIODS;
+	
+	avg_running = avg_running / rev.sampling_period;
 	dprintk("average_running is: %d\n", avg_running);
-
 
 	if (likely(!(flags & HOTPLUG_DISABLED))) {
 		if (unlikely((avg_running >= rev.shift_all) && (online_cpus < available_cpus))) {
@@ -168,8 +157,6 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 			return;
 		} else if ((avg_running >= enable_load) && (online_cpus < available_cpus)) {
 			pr_info("auto_hotplug: Onlining single CPU, avg running: %d\n", avg_running);
-			if (delayed_work_pending(&hotplug_offline_work))
-				cancel_delayed_work(&hotplug_offline_work);
 			schedule_work(&hotplug_online_single_work);
 			return;
 		} else if (avg_running <= disable_load) {
@@ -202,7 +189,7 @@ static void __cpuinit hotplug_online_all_work_fn(struct work_struct *work)
 	/*
 	 * Pause for 1 second before even considering offlining a CPU
 	 */
-	schedule_delayed_work(&hotplug_unpause_work, HZ * 1);
+	schedule_delayed_work(&hotplug_unpause_work, HZ);
 	schedule_delayed_work_on(0, &hotplug_decision_work, msecs_to_jiffies(rev.sample_time));
 }
 
@@ -227,10 +214,11 @@ static void hotplug_offline_work_fn(struct work_struct *work)
 	int cpu;
 
 	for_each_online_cpu(cpu) {
-		if (cpu && num_online_cpus() > rev.min_cpu) {
-			cpu_down(num_online_cpus() - 1);
-			dprintk("auto_hotplug: CPU%d down.\n", cpu);
-			break;
+		if (num_online_cpus() > rev.min_cpu)
+			if (cpu) {
+				cpu_down(num_online_cpus() - 1);
+				dprintk("auto_hotplug: CPU%d down.\n", cpu);
+				break;
 		}
 	}
 	schedule_delayed_work_on(0, &hotplug_decision_work, msecs_to_jiffies(rev.sample_time));
