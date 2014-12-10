@@ -57,7 +57,7 @@ static unsigned int input_boost_ms = 40;
 module_param(input_boost_ms, uint, 0644);
 
 static u64 last_input_time;
-#define MIN_INPUT_INTERVAL (150 * USEC_PER_MSEC)
+#define MIN_INPUT_INTERVAL (100 * USEC_PER_MSEC)
 
 /*
  * The CPUFREQ_ADJUST notifier is used to override the current policy min to
@@ -285,29 +285,8 @@ static void cpuboost_input_disconnect(struct input_handle *handle)
 }
 
 static const struct input_device_id cpuboost_ids[] = {
-	/* multi-touch touchscreen */
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
-			INPUT_DEVICE_ID_MATCH_ABSBIT,
-		.evbit = { BIT_MASK(EV_ABS) },
-		.absbit = { [BIT_WORD(ABS_MT_POSITION_X)] =
-			BIT_MASK(ABS_MT_POSITION_X) |
-			BIT_MASK(ABS_MT_POSITION_Y) },
-	},
-	/* touchpad */
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_KEYBIT |
-			INPUT_DEVICE_ID_MATCH_ABSBIT,
-		.keybit = { [BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH) },
-		.absbit = { [BIT_WORD(ABS_X)] =
-			BIT_MASK(ABS_X) | BIT_MASK(ABS_Y) },
-	},
-	/* Keypad */
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
-		.evbit = { BIT_MASK(EV_KEY) },
-	},
-	{ },
+	{ .driver_info = 1 },
+ { },
 };
 
 static struct input_handler cpuboost_input_handler = {
