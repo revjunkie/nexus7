@@ -118,7 +118,7 @@ static const struct tegra_emc_table Nakasi_dvfs_Elpida_table_0430[] = {
 			0x00000000, /* EMC_CTT */
 			0x00000000, /* EMC_CTT_DURATION */
 			0x80000287, /* EMC_DYN_SELF_REF_CONTROL */
-			0x00020001, /* MC_EMEM_ARB_CFG */
+			0x00030003, /* MC_EMEM_ARB_CFG */
 			0xc0000020, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
@@ -238,7 +238,7 @@ static const struct tegra_emc_table Nakasi_dvfs_Elpida_table_0430[] = {
 			0x00000000, /* EMC_CTT */
 			0x00000000, /* EMC_CTT_DURATION */
 			0x8000040b, /* EMC_DYN_SELF_REF_CONTROL */
-			0x00010001, /* MC_EMEM_ARB_CFG */
+			0x00010003, /* MC_EMEM_ARB_CFG */
 			0xc0000020, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
@@ -358,7 +358,7 @@ static const struct tegra_emc_table Nakasi_dvfs_Elpida_table_0430[] = {
 			0x00000000, /* EMC_CTT */
 			0x00000000, /* EMC_CTT_DURATION */
 			0x80000713, /* EMC_DYN_SELF_REF_CONTROL */
-			0x00000001, /* MC_EMEM_ARB_CFG */
+			0x00000003, /* MC_EMEM_ARB_CFG */
 			0xc0000030, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
@@ -478,7 +478,7 @@ static const struct tegra_emc_table Nakasi_dvfs_Elpida_table_0430[] = {
 			0x00000000, /* EMC_CTT */
 			0x00000000, /* EMC_CTT_DURATION */
 			0x80000d22, /* EMC_DYN_SELF_REF_CONTROL */
-			0x00000003, /* MC_EMEM_ARB_CFG */
+			0x00000006, /* MC_EMEM_ARB_CFG */
 			0xc0000025, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
@@ -598,7 +598,7 @@ static const struct tegra_emc_table Nakasi_dvfs_Elpida_table_0430[] = {
 			0x00000000, /* EMC_CTT */
 			0x00000000, /* EMC_CTT_DURATION */
 			0x800014d4, /* EMC_DYN_SELF_REF_CONTROL */
-			0x00000005, /* MC_EMEM_ARB_CFG */
+			0x0000000a, /* MC_EMEM_ARB_CFG */
 			0xc000003d, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000002, /* MC_EMEM_ARB_TIMING_RP */
@@ -718,7 +718,7 @@ static const struct tegra_emc_table Nakasi_dvfs_Elpida_table_0430[] = {
 			0x00000000, /* EMC_CTT */
 			0x00000000, /* EMC_CTT_DURATION */
 			0x800028a5, /* EMC_DYN_SELF_REF_CONTROL */
-			0x0000000a, /* MC_EMEM_ARB_CFG */
+			0x00000014, /* MC_EMEM_ARB_CFG */
 			0xc0000079, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000003, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000004, /* MC_EMEM_ARB_TIMING_RP */
