@@ -39,7 +39,7 @@
 
 #define PACKET_SIZE		40
 #define NEW_PACKET_SIZE 55
-#define FINGER_NUM		10
+#define FINGER_NUM		2
 		
 #define PWR_STATE_DEEP_SLEEP	0
 #define PWR_STATE_NORMAL		1
