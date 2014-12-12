@@ -44,7 +44,7 @@
 
 #define SHIFT_ALL			500
 #define SHIFT_CPU			225
-#define DOWN_SHIFT			80
+#define DOWN_SHIFT		100
 #define MIN_CPU			1
 #define MAX_CPU			4
 #define SAMPLE_TIME		20
@@ -179,7 +179,7 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 
 static void __cpuinit hotplug_online_all_work_fn(struct work_struct *work)
 {
-	int cpu;
+	unsigned int cpu;
 	for_each_possible_cpu(cpu) {
 		if (likely(!cpu_online(cpu))) {
 			cpu_up(cpu);
@@ -195,7 +195,7 @@ static void __cpuinit hotplug_online_all_work_fn(struct work_struct *work)
 
 static void __cpuinit hotplug_online_single_work_fn(struct work_struct *work)
 {
-	int cpu;
+	unsigned int cpu;
 
 	for_each_possible_cpu(cpu) {
 		if (cpu) {
@@ -211,7 +211,7 @@ static void __cpuinit hotplug_online_single_work_fn(struct work_struct *work)
 
 static void hotplug_offline_work_fn(struct work_struct *work)
 {
-	int cpu;
+	unsigned int cpu;
 
 	for_each_online_cpu(cpu) {
 		if (num_online_cpus() > rev.min_cpu)
