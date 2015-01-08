@@ -50,7 +50,7 @@
 #define grouper_lvds_rs_a00		TEGRA_GPIO_PH1
 
 /* common pins( backlight ) for all display boards */
-//#define grouper_bl_enb			TEGRA_GPIO_PH3
+#define grouper_bl_enb			TEGRA_GPIO_PH3
 #define grouper_bl_pwm			TEGRA_GPIO_PH0
 #define grouper_hdmi_hpd			TEGRA_GPIO_PN7
 
@@ -113,7 +113,6 @@ static int grouper_backlight_init(struct device *dev)
 
 	tegra_gpio_disable(grouper_bl_pwm);
 
-      /*
 	ret = gpio_request(grouper_bl_enb, "backlight_enb");
 	if (ret < 0)
 		return ret;
@@ -123,7 +122,6 @@ static int grouper_backlight_init(struct device *dev)
 		gpio_free(grouper_bl_enb);
 	else
 		tegra_gpio_enable(grouper_bl_enb);
-	*/
 
 	return ret;
 };
@@ -132,11 +130,9 @@ static void grouper_backlight_exit(struct device *dev)
 {
 	/* int ret; */
 	/*ret = gpio_request(grouper_bl_enb, "backlight_enb");*/
-	/*
 	gpio_set_value(grouper_bl_enb, 0);
 	gpio_free(grouper_bl_enb);
 	tegra_gpio_disable(grouper_bl_enb);
-	*/
 	return;
 }
 
@@ -145,7 +141,7 @@ static int grouper_backlight_notify(struct device *unused, int brightness)
 	int cur_sd_brightness = atomic_read(&sd_brightness);
 
 	/* Set the backlight GPIO pin mode to 'backlight_enable' */
-	//gpio_set_value(grouper_bl_enb, !!brightness);
+	gpio_set_value(grouper_bl_enb, !!brightness);
 
 	/* SD brightness is a percentage, 8-bit value. */
 	brightness = (brightness * cur_sd_brightness) / 255;
