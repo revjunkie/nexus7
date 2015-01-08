@@ -66,9 +66,9 @@ static struct regulator *grouper_lvds_reg;
 static struct regulator *grouper_lvds_vdd_panel;
 
 static tegra_dc_bl_output grouper_bl_output_measured = {
-	0, 8, 8, 8, 8, 8, 8, 8,
- 	8, 8, 8, 8, 8, 8, 8, 8,
-	9, 11, 13, 14, 15, 16, 17, 18,
+	0, 13, 13, 13, 13, 13, 13, 13,
+	13, 13, 13, 13, 13, 13, 14, 15,
+	16, 17, 18, 19, 20, 21, 22, 23,
 	19, 20, 21, 22, 23, 24, 25, 26,
 	28, 31, 34, 35, 36, 37, 38, 39,
 	40, 41, 42, 43, 44, 45, 46, 47,
@@ -410,7 +410,7 @@ static struct tegra_dc_sd_settings grouper_sd_settings = {
 	.bin_width = -1,
 	.aggressiveness = 1,
 	.phase_in_adjustments = true,
-	.panel_min_brightness = 8,
+	.panel_min_brightness = 13,
 #ifdef CONFIG_TEGRA_SD_GEN2
  	.k_limit_enable = true,
  	.k_limit = 180,
