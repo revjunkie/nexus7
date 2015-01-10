@@ -119,16 +119,11 @@ void read_hw_version(void)
 /* Enable or disable the callback for the battery driver. */
 #define BATTERY_CALLBACK_ENABLED 1
 
-/* Enable or disable the callback for the battery driver. */
-#define TOUCH_CALLBACK_ENABLED 1
 
 #if BATTERY_CALLBACK_ENABLED
 extern void battery_callback(unsigned cable_status);
 #endif
 
-#if TOUCH_CALLBACK_ENABLED
-extern void touch_callback(unsigned cable_status);
-#endif
 
 static int fsl_charging_mode = 0;
 static int fsl_charging_current = 0;
@@ -294,9 +289,7 @@ static void cable_detection_work_handler(struct work_struct *w)
 			battery_callback(s_cable_info.cable_status);
 #endif
 		}
-#if TOUCH_CALLBACK_ENABLED
-		touch_callback(s_cable_info.cable_status);
-#endif
+
 	} else if (!s_cable_info.udc_vbus_active && s_cable_info.is_active) {
 		val = fsl_readl(&dr_regs->usbcmd);
 		if (val & USB_CMD_RUN_STOP) {
@@ -334,9 +327,7 @@ static void cable_detection_work_handler(struct work_struct *w)
 			battery_callback(s_cable_info.cable_status);
 #endif
 		}
-#if TOUCH_CALLBACK_ENABLED
-		touch_callback(s_cable_info.cable_status);
-#endif
+
 	}
 	mutex_unlock(&s_cable_info.cable_info_mutex);
 }

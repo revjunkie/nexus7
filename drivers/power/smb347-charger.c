@@ -922,9 +922,7 @@ static int cable_type_detect(void)
 		charger->cur_cable_type = non_cable;
 		smb347_set_InputCurrentlimit(client, 900);
 		success = battery_callback(non_cable);
-#ifdef TOUCH_CALLBACK_ENABLED
-               touch_callback(non_cable);
-#endif
+
 		wake_unlock(&charger_wakelock);
 	} else {
 		printk(KERN_INFO "INOK=L\n");
@@ -948,30 +946,22 @@ static int cable_type_detect(void)
 						printk(KERN_INFO "Cable: CDP\n");
 						charger->cur_cable_type = ac_cable;
 						success = battery_callback(ac_cable);
-#ifdef TOUCH_CALLBACK_ENABLED
-	                                    touch_callback(ac_cable);
-#endif
+
 					} else if (retval == APSD_DCP) {
 						printk(KERN_INFO "Cable: DCP\n");
 						charger->cur_cable_type = ac_cable;
 						success = battery_callback(ac_cable);
-#ifdef TOUCH_CALLBACK_ENABLED
-	                                    touch_callback(ac_cable);
-#endif
+
 					} else if (retval == APSD_OTHER) {
 						charger->cur_cable_type = ac_cable;
 						success = battery_callback(ac_cable);
-#ifdef TOUCH_CALLBACK_ENABLED
-	                                   touch_callback(ac_cable);
-#endif
+
 						printk(KERN_INFO "Cable: OTHER\n");
 					} else if (retval == APSD_SDP) {
 						printk(KERN_INFO "Cable: SDP\n");
 						charger->cur_cable_type = usb_cable;
 						success = battery_callback(usb_cable);
-#ifdef TOUCH_CALLBACK_ENABLED
-	                                    touch_callback(usb_cable);
-#endif
+
 					} else {
 						charger->cur_cable_type = unknow_cable;
 						printk(KERN_INFO "Unkown Plug In Cable type !\n");
